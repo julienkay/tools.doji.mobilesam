@@ -119,7 +119,7 @@ namespace Doji.AI.Segmentation {
             // Transform the image to the form expected by the model
             using Tensor inputImageTensor = ApplyImage(image);
             SetImage(inputImageTensor, origSize);
-            if (Result != null) Result.Release();   
+            if (Result != null) Result.Release();
             Result = new RenderTexture(image.width, image.height, 0, OutputFormat);
         }
 
