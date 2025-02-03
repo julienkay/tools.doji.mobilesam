@@ -66,7 +66,7 @@ namespace Doji.AI.Segmentation {
                 }
             }
         }
-        private BackendType _backend = BackendType.CPU;
+        private BackendType _backend = BackendType.GPUCompute;
 
         /// <summary>
         /// Which format the predicted masks are returned as.
