@@ -4,7 +4,7 @@
   "displayName": "MobileSAM",
   "description": "Fast Segmentation with Unity Sentis using MobileSAM",
   "dependencies": {
-    "com.unity.sentis": "2.1.1"
+    "com.unity.sentis": "2.1.2"
   },
   "author": {
     "name": "Doji Technologies",
