@@ -4,6 +4,7 @@ Welcome to the MobileSAM package! This package allows you to perform segmentatio
 
 ## Table of Contents
 - [Installation](#installation)
+- [Get the Models](#get-the-models)
 - [Basic Setup](#basic-setup)
 - [Performing Segmentation](#performing-segmentation)
 - [Full Example](#full-example)
@@ -17,18 +18,40 @@ add a new scoped registry:
 
 `Name: Doji`
 `URL: https://package.openupm.com`
-`Scope(s): com.doji`
+`Scope(s): com.doji, tools.doji`
 
 In the Package Manager install `com.doji.mobilesam` either by name or select it in the list under `Package Manager -> My Registries`
+
+MobileSAM requires Unity 6000.3 or later. Package Manager also installs Inference Engine and AI Model Hub (`tools.doji.hf-hub`).
+
+## Get the Models
+
+The package does not contain model files. It loads the encoder and decoder from the Hugging Face repository
+[julienkay/sentis-MobileSAM](https://huggingface.co/julienkay/sentis-MobileSAM) through AI Model Hub.
+
+1. Open `Window > AI Model Hub`.
+2. Select `julienkay/sentis-MobileSAM` and click **Download & Import**.
+
+Builds bundle the imported models by default. To download them in the player instead, see the
+[AI Model Hub manual](https://docs.doji-tech.com/tools.doji.hf-hub/manual/getting-started-project-users.html). A player that downloads ONNX models also needs the ONNX Model Loader
+package (`tools.doji.onnx-model-loader`) to convert them.
 
 ## Basic Setup
 
 To begin using MobileSAM, you need to create an instance of the `MobileSAM` class. The instance will handle loading the models and initializing the segmentation process.
 
+`CreateAsync` works on every platform, also when the models are downloaded at runtime:
+
 ```csharp
 using Doji.AI.Segmentation;
 
-// Initialize MobileSAM
+MobileSAM mobileSAMPredictor = await MobileSAM.CreateAsync();
+```
+
+The constructor loads the models without waiting. It works in the Editor and for bundled models on Windows,
+macOS, Linux and iOS:
+
+```csharp
 MobileSAM mobileSAMPredictor = new MobileSAM();
 ```
 
@@ -91,10 +114,10 @@ public class SegmentationExample : MonoBehaviour
     public Texture TestImage;
     public RenderTexture Result;
 
-    private void Start()
+    private async void Start()
     {
-        // Initialize the MobileSAM predictor
-        _mobileSAMPredictor = new MobileSAM();
+        // Load the models from AI Model Hub and initialize the MobileSAM predictor
+        _mobileSAMPredictor = await MobileSAM.CreateAsync();
         
         // Set the image for segmentation
         _mobileSAMPredictor.SetImage(TestImage);

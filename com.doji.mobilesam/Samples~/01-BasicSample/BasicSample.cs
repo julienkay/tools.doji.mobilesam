@@ -20,8 +20,14 @@ namespace Doji.AI.Segmentation.Samples {
         
         private List<GameObject> _pointUIElements = new List<GameObject>();
 
-        public void Start () {
-            _mobileSAMPredictor = new MobileSAM();
+        public async void Start () {
+            // Loads the models from HF Hub; models that are downloaded at runtime are fetched first.
+            var predictor = await MobileSAM.CreateAsync();
+            if (this == null) {
+                predictor.Dispose();
+                return;
+            }
+            _mobileSAMPredictor = predictor;
             _mobileSAMPredictor.SetImage(SourceImage.texture);
             Result = _mobileSAMPredictor.Result;
             MaskImage.texture = _mobileSAMPredictor.Result;
@@ -32,6 +38,10 @@ namespace Doji.AI.Segmentation.Samples {
         }
 
         public void PredictMask() {
+            if (_mobileSAMPredictor == null) {
+                Debug.LogWarning("The models are still loading.");
+                return;
+            }
             _mobileSAMPredictor.Predict(_points.ToArray(), _labels.ToArray());
             MaskImage.enabled = true;
         }

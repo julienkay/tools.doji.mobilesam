@@ -1,6 +1,6 @@
 # MobileSAM
 
-Fast Segmentation with Unity Sentis using [MobileSAM]
+Fast Segmentation with Unity Inference Engine using [MobileSAM]
 
 ## Usage
 

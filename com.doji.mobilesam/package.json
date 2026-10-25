@@ -1,10 +1,12 @@
 {
   "name": "com.doji.mobilesam",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "displayName": "MobileSAM",
-  "description": "Fast Segmentation with Unity Sentis using MobileSAM",
+  "description": "Fast Segmentation with Unity Inference Engine using MobileSAM",
+  "unity": "6000.3",
   "dependencies": {
-    "com.unity.sentis": "2.1.2"
+    "tools.doji.hf-hub": "1.0.0",
+    "com.unity.ai.inference": "2.6.1"
   },
   "author": {
     "name": "Doji Technologies",

@@ -1,5 +1,5 @@
 using System;
-using Unity.Sentis;
+using Unity.InferenceEngine;
 using UnityEngine;
 
 namespace Doji.AI.Segmentation {
@@ -12,16 +12,14 @@ namespace Doji.AI.Segmentation {
         internal static class Transforms {
 
             public static Tensor ApplyImage(Texture image) {
-                TextureTransform transform = new TextureTransform();
-
                 // expects shape in HxWxC format.
-                transform.SetTensorLayout(TensorLayout.NHWC);
+                TextureTransform transform = new TextureTransform().SetTensorLayout(TensorLayout.NHWC);
 
                 // resize longest side to 1024
                 (int newH, int newW) = GetPreprocessShape(image.height, image.width, IMG_SIZE);
-                transform.SetDimensions(newW, newH);
 
-                var tensor = TextureConverter.ToTensor(image, transform);
+                var tensor = new Tensor<float>(new TensorShape(1, newH, newW, 3));
+                TextureConverter.ToTensor(image, tensor, transform);
                 tensor.Reshape(tensor.shape.Squeeze(0));
                 return tensor;
             }

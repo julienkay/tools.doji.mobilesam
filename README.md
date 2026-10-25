@@ -3,7 +3,7 @@
 </a>
 
 # MobileSAM
-Fast Segmentation with Unity Sentis using [MobileSAM](https://github.com/ChaoningZhang/MobileSAM)[^1] models.
+Fast Segmentation with Unity Inference Engine using [MobileSAM](https://github.com/ChaoningZhang/MobileSAM)[^1] models.
 
 [Asset Store] · [OpenUPM] · [Documentation]
 

@@ -90,3 +90,10 @@ Thumbs.db
 # ====== #
 /[Uu]ploads/
 /[Pp]ackages/[Cc]om.unity.asset-store-tools*
+
+# Local experiments: models, videos and test files outside the project
+/[Aa]ssets/[Ee]xperiments/
+/[Aa]ssets/[Ee]xperiments.meta
+
+# Rider
+.idea/

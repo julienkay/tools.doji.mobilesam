@@ -1,5 +1,9 @@
 using System;
-using Unity.Sentis;
+using System.Threading;
+using System.Threading.Tasks;
+using Doji.AI.ModelHub;
+using Doji.Downloads;
+using Unity.InferenceEngine;
 using UnityEngine;
 using static Doji.AI.Segmentation.MobileSAM.Transforms;
 
@@ -25,33 +29,15 @@ namespace Doji.AI.Segmentation {
     /// </summary>
     public partial class MobileSAM : IDisposable {
 
-        public Model Encoder {
-            get {
-                if (_encoderAsset == null) {
-                    _encoderAsset = Resources.Load<ModelAsset>("ONNX/mobilesam.encoder");
-                }
-                if (_encoderAsset == null) {
-                    Debug.LogError("MobileSAM encoder ONNX model not found.");
-                }
-                return _encoderModel ??= ModelLoader.Load(_encoderAsset);
-            }
-        }
-        private Model _encoderModel;
-        private static ModelAsset _encoderAsset;
+        /// <summary>
+        /// The image encoder, with the pixel scaling of <see cref="SetImage(Texture)"/> added.
+        /// </summary>
+        public Model Encoder { get; private set; }
 
-        public Model Decoder {
-            get {
-                if (_decoderAsset == null) {
-                    _decoderAsset = Resources.Load<ModelAsset>("ONNX/mobilesam.decoder");
-                }
-                if (_decoderAsset == null) {
-                    Debug.LogError("MobileSAM decoder ONNX model not found.");
-                }
-                return _decoderModel ??= ModelLoader.Load(_decoderAsset);
-            }
-        }
-        private static Model _decoderModel;
-        private ModelAsset _decoderAsset;
+        /// <summary>
+        /// The mask decoder.
+        /// </summary>
+        public Model Decoder { get; private set; }
 
         /// <summary>
         /// Which <see cref="BackendType"/> to run the model with.
@@ -62,7 +48,7 @@ namespace Doji.AI.Segmentation {
                 if (_backend != value) {
                     DisposeModels();
                     _backend = value;
-                    InitializeNetwork();
+                    CreateWorkers();
                 }
             }
         }
@@ -85,22 +71,73 @@ namespace Doji.AI.Segmentation {
         public RenderTexture Result { get; private set; }
 
         /// <summary>
-        /// Initializes a new instance of a mask predictor.
+        /// Initializes a new instance of a mask predictor and loads the models without waiting.
         /// </summary>
-        public MobileSAM() {
-            InitializeNetwork();
+        /// <remarks>
+        /// The models come from HF Hub (<c>tools.doji.hf-hub</c>). Loading without waiting works in the Editor and
+        /// for bundled models on Windows, macOS, Linux and iOS. On Android and the Web, or when the models are
+        /// downloaded at runtime, use <see cref="CreateAsync"/>.
+        /// </remarks>
+        public MobileSAM(BackendType backend = BackendType.GPUCompute)
+            : this(LoadModel(ModelFiles.EncoderPath), LoadModel(ModelFiles.DecoderPath), backend) { }
+
+        /// <summary>
+        /// Initializes a new instance of a mask predictor with models that you loaded yourself.
+        /// </summary>
+        /// <param name="encoder">The MobileSAM image encoder, without pixel scaling.</param>
+        /// <param name="decoder">The MobileSAM mask decoder.</param>
+        /// <param name="backend">The backend to run the models with.</param>
+        public MobileSAM(Model encoder, Model decoder, BackendType backend = BackendType.GPUCompute) {
+            if (encoder == null) {
+                throw new ArgumentNullException(nameof(encoder));
+            }
+            Decoder = decoder ?? throw new ArgumentNullException(nameof(decoder));
+            Encoder = AddPreprocessing(encoder);
+            _backend = backend;
+            CreateWorkers();
         }
 
-        private void InitializeNetwork() {
-            if (Encoder == null) {
-                return;
-            }
-            if (Decoder == null) {
-                return;
-            }
+        /// <summary>
+        /// Loads the models from HF Hub and creates a mask predictor. Works on every platform, and for
+        /// bundled and downloaded models. Downloaded models are fetched on first use.
+        /// </summary>
+        /// <param name="backend">The backend to run the models with.</param>
+        /// <param name="progress">Reports download progress when the models are downloaded at runtime.</param>
+        /// <param name="cancellationToken">Cancels the download.</param>
+        public static async Task<MobileSAM> CreateAsync(
+            BackendType backend = BackendType.GPUCompute,
+            IProgress<DownloadProgress> progress = null,
+            CancellationToken cancellationToken = default) {
 
-            _encoderModel = AddPreprocessing(_encoderModel);
+            Model encoder = await LoadModelAsync(ModelFiles.EncoderPath, progress, cancellationToken);
+            Model decoder = await LoadModelAsync(ModelFiles.DecoderPath, progress, cancellationToken);
+            return new MobileSAM(encoder, decoder, backend);
+        }
 
+        private static Model LoadModel(string repoPath) {
+            try {
+                return Hub.LoadModel(ModelFiles.PackageId, ModelFiles.RepositoryId, repoPath);
+            } catch (Exception exception) {
+                throw LoadException(repoPath, exception);
+            }
+        }
+
+        private static async Task<Model> LoadModelAsync(string repoPath, IProgress<DownloadProgress> progress, CancellationToken cancellationToken) {
+            try {
+                return await Hub.LoadModelAsync(ModelFiles.PackageId, ModelFiles.RepositoryId, repoPath, progress, cancellationToken);
+            } catch (Exception exception) when (!(exception is OperationCanceledException)) {
+                throw LoadException(repoPath, exception);
+            }
+        }
+
+        private static InvalidOperationException LoadException(string repoPath, Exception exception) {
+            return new InvalidOperationException(
+                $"Could not load MobileSAM model '{ModelFiles.RepositoryId}:{repoPath}'. " +
+                $"Include the model in the AI Model Hub window. {exception.Message}",
+                exception);
+        }
+
+        private void CreateWorkers() {
             _encoder = new Worker(Encoder, Backend);
             _decoder = new Worker(Decoder, Backend);
         }
@@ -121,10 +158,12 @@ namespace Doji.AI.Segmentation {
             SetImage(inputImageTensor, origSize);
             if (Result != null) Result.Release();
             Result = new RenderTexture(image.width, image.height, 0, OutputFormat);
+            Result.enableRandomWrite = true;
+            Result.Create();
         }
 
         public void SetImage(Tensor transformedImage, (int height, int width) origSize) {
-            Debug.Assert(Math.Max(transformedImage.shape[0], transformedImage.shape[1]) == IMG_SIZE, "Image must have a long side of {IMG_SIZE}}.");
+            Debug.Assert(Math.Max(transformedImage.shape[0], transformedImage.shape[1]) == IMG_SIZE, $"Image must have a long side of {IMG_SIZE}.");
             ResetImage();
             _origSize = origSize;
             _inputSize = new Vector2Int(transformedImage.shape[-2], transformedImage.shape[-1]);
@@ -214,7 +253,8 @@ namespace Doji.AI.Segmentation {
 
         public void Dispose() {
             DisposeModels();
-            Result.Release();
+            if (Result != null)
+                Result.Release();
         }
 
         private void DisposeModels() {

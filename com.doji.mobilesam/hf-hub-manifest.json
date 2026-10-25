@@ -1,0 +1,16 @@
+{
+    "version": 1,
+    "models": [
+        {
+            "id": "julienkay/sentis-MobileSAM",
+            "files": [
+                {
+                    "path": "onnx/mobilesam.encoder.onnx"
+                },
+                {
+                    "path": "onnx/mobilesam.decoder.onnx"
+                }
+            ]
+        }
+    ]
+}
